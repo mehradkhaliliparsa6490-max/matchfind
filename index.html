@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#4a90e2">
+  <title>موتور جستجو</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh; padding: 20px; color: #333;
+    }
+    .container {
+      max-width: 950px; margin: 0 auto; background: #fff;
+      border-radius: 16px; padding: 28px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    h1 { font-size: 24px; margin-bottom: 6px; color: #4a3f8f; text-align: center; }
+    .subtitle { text-align: center; color: #888; font-size: 13px; margin-bottom: 22px; }
+
+    .step {
+      background: #f8f9fc; border-radius: 12px; padding: 18px;
+      margin-bottom: 14px; border: 1px solid #e8eaf2;
+    }
+    .step.disabled { opacity: 0.45; pointer-events: none; }
+    .step-title {
+      font-size: 14px; font-weight: bold; color: #4a3f8f;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .step-num {
+      display: inline-flex; width: 24px; height: 24px;
+      background: #4a3f8f; color: #fff; border-radius: 50%;
+      align-items: center; justify-content: center; font-size: 12px;
+    }
+    .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 600px) { .upload-row { grid-template-columns: 1fr; } }
+    .drop-zone {
+      border: 2px dashed #b8b8d8; border-radius: 10px; padding: 16px;
+      text-align: center; cursor: pointer; transition: all 0.2s;
+      background: #fff; min-height: 100px;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+    }
+    .drop-zone:hover, .drop-zone.dragover { border-color: #4a90e2; background: #eef5ff; }
+    .drop-zone .icon { font-size: 24px; margin-bottom: 4px; }
+    .drop-zone .label { font-weight: bold; color: #4a3f8f; font-size: 13px; }
+    .drop-zone .hint { font-size: 11px; color: #999; margin-top: 2px; }
+    .drop-zone .filename {
+      font-size: 12px; color: #2e7d32; font-weight: bold;
+      margin-top: 6px; word-break: break-all;
+    }
+
+    .field-row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .field-row label { font-size: 13px; color: #555; min-width: 150px; font-weight: bold; }
+    .field-row input[type="text"], .field-row input[type="number"], .field-row select {
+      padding: 8px 10px; border: 1px solid #ccc; border-radius: 8px;
+      font-family: inherit; font-size: 13px; background: #fff;
+    }
+    .field-row input[type="text"] { flex: 1; min-width: 150px; }
+    .field-row input[type="number"] { width: 90px; text-align: center; }
+    .field-row select { min-width: 220px; cursor: pointer; }
+    .field-row small { color: #999; font-size: 11px; }
+
+    .columns-box {
+      background: #fff; border: 1px solid #e8eaf2; border-radius: 10px;
+      padding: 12px; max-height: 180px; overflow-y: auto; margin-top: 6px;
+    }
+    .col-checkbox {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; transition: background 0.15s;
+    }
+    .col-checkbox:hover { background: #eef5ff; }
+    .col-checkbox input { cursor: pointer; }
+    .col-checkbox .col-letter {
+      display: inline-block; min-width: 30px; font-weight: bold;
+      color: #4a3f8f; font-family: monospace;
+    }
+    .col-checkbox .col-header { color: #555; flex: 1; }
+    .col-checkbox .col-header.empty { color: #bbb; font-style: italic; }
+
+    .info-box {
+      background: #e3f2fd; color: #1565c0; padding: 10px 12px;
+      border-radius: 8px; font-size: 12px; margin-top: 8px;
+      border-right: 3px solid #1565c0;
+    }
+
+    .actions { display: flex; gap: 10px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+    button {
+      padding: 12px 26px; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: bold; cursor: pointer;
+      font-family: inherit; transition: all 0.2s;
+    }
+    #runBtn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff; box-shadow: 0 6px 18px rgba(102,126,234,0.4);
+    }
+    #runBtn:hover:not(:disabled) { transform: translateY(-2px); }
+    #runBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #resetBtn { background: #eee; color: #555; }
+    #resetBtn:hover { background: #ddd; }
+    #downloadBtn {
+      background: linear-gradient(135deg, #11998e, #38ef7d); color: #fff;
+      display: none;
+    }
+    #downloadBtn:hover { transform: translateY(-2px); }
+
+    .progress {
+      height: 8px; background: #eee; border-radius: 4px;
+      overflow: hidden; margin: 12px 0;
+    }
+    .progress-bar {
+      height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);
+      width: 0%; transition: width 0.15s;
+    }
+    .progress-text { text-align: center; font-size: 12px; color: #666; margin-bottom: 8px; }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat-card { padding: 14px; border-radius: 10px; text-align: center; }
+    .stat-card .num { font-size: 24px; font-weight: bold; }
+    .stat-card .lbl { font-size: 11px; margin-top: 4px; }
+    .stat-green { background: #e8f5e9; color: #2e7d32; }
+    .stat-red   { background: #fdecea; color: #b71c1c; }
+    .stat-blue  { background: #e3f2fd; color: #1565c0; }
+
+    .footer { text-align: center; font-size: 11px; color: #aaa; margin-top: 20px; }
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: #333; color: #fff;
+      padding: 12px 20px; border-radius: 8px; font-size: 13px;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      max-width: 320px;
+    }
+    .toast.show { opacity: 1; }
+    .hidden { display: none; }
+
+    details { margin-top: 6px; }
+    summary { cursor: pointer; font-size: 12px; color: #4a90e2; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔎 موتور جستجو</h1>
+    <p class="subtitle">جستجوی هوشمند + افزودن ستون‌های انتخابی از فایل دوم به فایل اول</p>
+
+    <!-- مرحله ۱: بارگذاری -->
+    <div class="step" id="step1">
+      <div class="step-title"><span class="step-num">۱</span> بارگذاری فایل‌ها</div>
+      <div class="upload-row">
+        <div class="drop-zone" id="zone1">
+          <div class="icon">📁</div>
+          <div class="label">فایل اول (اصلاح‌شونده)</div>
+          <div class="hint">xlsx</div>
+          <div class="filename" id="name1"></div>
+          <input type="file" id="file1" accept=".xlsx,.xls" hidden>
+        </div>
+        <div class="drop-zone" id="zone2">
+          <div class="icon">📁</div>
+          <div class="label">فایل دوم (مرجع)</div>
+          <div class="hint">xlsx</div>
+          <div class="filename" id="name2"></div>
+          <input type="file" id="file2" accept=".xlsx,.xls" hidden>
+        </div>
+      </div>
+    </div>
+
+    <!-- مرحله ۲: انتخاب ستون‌های مقایسه -->
+    <div class="step disabled" id="step2">
+      <div class="step-title"><span class="step-num">۲</span> ستون‌های مقایسه</div>
+
+      <div class="field-row">
+        <label>ستون کلید فایل اول:</label>
+        <select id="col1Select"><option value="">-- ابتدا فایل را بارگذاری کنید --</option></select>
+      </div>
+
+      <div class="field-row">
+        <label>ستون کلید فایل دوم:</label>
+        <select id="col2Select"><option value="">-- ابتدا فایل را بارگذاری کنید --</option></select>
+      </div>
+
+      <div class="field-row">
+        <label>سطر شروع داده‌ها:</label>
+        <input type="number" id="startRow" value="2" min="1">
+        <small>سطر ۱ معمولاً عنوان است</small>
+      </div>
+
+      <div class="field-row">
+        <label>عبارت افزودنی (در صورت تطبیق):</label>
+        <input type="text" id="matchText" value="✓ موجود">
+        <small>در ستون «نتیجه جستجو» نوشته می‌شود</small>
+      </div>
+
+      <div class="field-row">
+        <label>رنگ سطرهای نامطابق:</label>
+        <select id="rowColor">
+          <option value="FFC7CE" selected>قرمز (FFC7CE)</option>
+          <option value="FFEB9C">زرد (FFEB9C)</option>
+          <option value="BDD7EE">آبی (BDD7EE)</option>
+          <option value="F8CBAD">نارنجی (F8CBAD)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- مرحله ۳: انتخاب ستون‌های افزودنی -->
+    <div class="step disabled" id="step3">
+      <div class="step-title"><span class="step-num">۳</span> ستون‌های افزودنی از فایل دوم</div>
+      <p style="font-size:12px;color:#777;margin-bottom:8px;">
+        ستون‌هایی که می‌خواهید در صورت تطبیق، مقدارشان از فایل دوم به فایل اول اضافه شود را انتخاب کنید:
+      </p>
+      <div class="columns-box" id="addColsBox">
+        <p style="color:#999;font-size:12px;text-align:center;padding:10px;">
+          ابتدا فایل دوم را بارگذاری کنید
+        </p>
+      </div>
+    </div>
+
+    <!-- دکمه‌ها -->
+    <div class="actions">
+      <button id="runBtn" disabled>🚀 شروع جستجو</button>
+      <button id="resetBtn">↺ بازنشانی</button>
+      <button id="downloadBtn">⬇️ دانلود فایل اصلاح‌شده</button>
+    </div>
+
+    <!-- پیشرفت -->
+    <div id="progressWrap" class="hidden">
+      <div class="progress-text" id="progressText">در حال آماده‌سازی...</div>
+      <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+    </div>
+
+    <!-- نتایج -->
+    <div id="results" class="hidden">
+      <div class="stats">
+        <div class="stat-card stat-green">
+          <div class="num" id="countMatch">0</div>
+          <div class="lbl">پیدا شد (اطلاعات اضافه شد)</div>
+        </div>
+        <div class="stat-card stat-red">
+          <div class="num" id="countNoMatch">0</div>
+          <div class="lbl">پیدا نشد (رنگی شد)</div>
+        </div>
+        <div class="stat-card stat-blue">
+          <div class="num" id="countTotal">0</div>
+          <div class="lbl">کل سطرهای بررسی‌شده</div>
+        </div>
+      </div>
+      <p style="text-align:center;font-size:13px;color:#666;">
+        ✅ فایل اصلاح‌شده آماده است. روی دکمه «دانلود فایل اصلاح‌شده» کلیک کنید.
+      </p>
+    </div>
+
+    <div class="footer">موتور جستجو • PWA • بدون ارسال داده به سرور</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const state = {
+      file1Buffer: null,
+      file2Buffer: null,
+      file1Name: '',
+      file2Name: '',
+      file2Headers: [], // [{index, letter, header, values:Set}] برای هر ستون
+      file1Headers: [], // [{index, letter, header}]
+      resultBlob: null,
+      resultName: ''
+    };
+
+    const zone1 = $('zone1'), zone2 = $('zone2');
+    const file1 = $('file1'), file2 = $('file2');
+    const name1 = $('name1'), name2 = $('name2');
+    const runBtn = $('runBtn'), resetBtn = $('resetBtn'), downloadBtn = $('downloadBtn');
+    const step2 = $('step2'), step3 = $('step3');
+    const progressWrap = $('progressWrap'), progressBar = $('progressBar'), progressText = $('progressText');
+    const resultsDiv = $('results');
+    const addColsBox = $('addColsBox');
+
+    // ====== NORMALIZATION (مقایسه هوشمند) ======
+    // حذف فاصله‌ها، نرمال‌سازی اعداد فارسی/عربی، یکسان‌سازی حروف
+    function normalize(val) {
+      if (val == null) return '';
+      let s = String(val).trim();
+
+      // تبدیل اعداد فارسی/عربی به انگلیسی
+      const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+      const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+      s = s.replace(/[۰-۹]/g, c => persianDigits.indexOf(c))
+           .replace(/[٠-٩]/g, c => arabicDigits.indexOf(c));
+
+      // حذف فاصله‌های ابتدا/انتها و چندتایی
+      s = s.replace(/\s+/g, ' ').trim();
+
+      // اگر رشته عددی خالص بود (با کاما یا نقطه به‌عنوان جداکننده هزارگان)، به عدد تبدیل کن
+      const numericCandidate = s.replace(/[,٬]/g, '').replace(/[٫]/g, '.');
+      if (numericCandidate !== '' && !isNaN(Number(numericCandidate))) {
+        // حذف صفرهای اضافی انتهایی در اعشار
+        return String(Number(numericCandidate));
+      }
+
+      // غیرحساس به حروف بزرگ/کوچک
+      return s.toLowerCase();
+    }
+
+    // ====== HELPERS ======
+    function colIndexToLetter(idx) {
+      let s = '';
+      let n = idx + 1;
+      while (n > 0) {
+        const mod = (n - 1) % 26;
+        s = String.fromCharCode(65 + mod) + s;
+        n = Math.floor((n - mod) / 26);
+      }
+      return s;
+    }
+
+    function cellToString(cell) {
+      if (!cell || cell.value == null) return '';
+      let v = cell.value;
+      if (typeof v === 'object') {
+        if (v.text !== undefined) v = v.text;
+        else if (v.result !== undefined) v = v.result;
+        else if (v.richText) v = v.richText.map(r => r.text).join('');
+        else if (v instanceof Date) v = v.toISOString();
+        else if (v.error) v = '';
+        else v = String(v);
+      }
+      return String(v).trim();
+    }
+
+    // ====== UPLOAD ======
+    function setupDropZone(zone, input, nameEl, which) {
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; handleFile(e.dataTransfer.files[0], nameEl, which); }
+      });
+      input.addEventListener('change', e => {
+        if (e.target.files.length) handleFile(e.target.files[0], nameEl, which);
+      });
+    }
+
+    async function handleFile(file, nameEl, which) {
+      if (!/\.(xlsx|xls)$/i.test(file.name)) {
+        showToast('فقط فایل‌های xlsx پشتیبانی می‌شوند');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async e => {
+        const buf = e.target.result;
+        if (which === 1) { state.file1Buffer = buf; state.file1Name = file.name; }
+        else { state.file2Buffer = buf; state.file2Name = file.name; }
+        nameEl.textContent = '✓ ' + file.name;
+
+        // خواندن هدرها
+        try {
+          const wb = new ExcelJS.Workbook();
+          await wb.xlsx.load(buf);
+          const ws = wb.worksheets[0];
+          const headers = [];
+          const maxCol = Math.max(ws.columnCount, 1);
+          for (let c = 1; c <= maxCol; c++) {
+            const headerCell = ws.getCell(1, c);
+            const header = cellToString(headerCell) || '(بدون عنوان)';
+            headers.push({ index: c - 1, letter: colIndexToLetter(c - 1), header });
+          }
+          if (which === 1) {
+            state.file1Headers = headers;
+            populateSelect($('col1Select'), headers, '-- ستون کلید فایل اول --');
+          } else {
+            state.file2Headers = headers;
+            populateSelect($('col2Select'), headers, '-- ستون کلید فایل دوم --');
+            populateAddColumns(headers);
+          }
+        } catch (err) {
+          console.error(err);
+          showToast('خطا در خواندن هدر: ' + err.message);
+        }
+        checkReady();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function populateSelect(select, headers, placeholder) {
+      select.innerHTML = '';
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = placeholder;
+      select.appendChild(opt0);
+      headers.forEach(h => {
+        const opt = document.createElement('option');
+        opt.value = h.index;
+        opt.textContent = `${h.letter} — ${h.header}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function populateAddColumns(headers) {
+      addColsBox.innerHTML = '';
+      if (!headers.length) {
+        addColsBox.innerHTML = '<p style="color:#999;font-size:12px;text-align:center;padding:10px;">ستونی یافت نشد</p>';
+        return;
+      }
+      headers.forEach(h => {
+        const label = document.createElement('label');
+        label.className = 'col-checkbox';
+        label.innerHTML = `
+          <input type="checkbox" value="${h.index}" data-header="${escapeHtml(h.header)}" data-letter="${h.letter}">
+          <span class="col-letter">${h.letter}</span>
+          <span class="col-header ${h.header === '(بدون عنوان)' ? 'empty' : ''}">${escapeHtml(h.header)}</span>
+        `;
+        addColsBox.appendChild(label);
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    setupDropZone(zone1, file1, name1, 1);
+    setupDropZone(zone2, file2, name2, 2);
+
+    function checkReady() {
+      const ready = state.file1Buffer && state.file2Buffer;
+      step2.classList.toggle('disabled', !ready);
+      step3.classList.toggle('disabled', !ready);
+      runBtn.disabled = !ready;
+      if (ready) showToast('فایل‌ها بارگذاری شدند. تنظیمات را انجام دهید.');
+    }
+
+    // ====== MAIN ======
+    runBtn.addEventListener('click', async () => {
+      const col1Idx = parseInt($('col1Select').value);
+      const col2Idx = parseInt($('col2Select').value);
+      if (isNaN(col1Idx) || isNaN(col2Idx)) {
+        showToast('ستون‌های کلید را انتخاب کنید');
+        return;
+      }
+
+      const startRow = Math.max(1, parseInt($('startRow').value) || 2);
+      const matchText = $('matchText').value || '✓ موجود';
+      const rowColor = $('rowColor').value;
+
+      // ستون‌های افزودنی انتخابی
+      const addCols = Array.from(addColsBox.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(cb => ({
+          index: parseInt(cb.value),
+          letter: cb.dataset.letter,
+          header: cb.dataset.header
+        }));
+
+      runBtn.disabled = true;
+      progressWrap.classList.remove('hidden');
+      resultsDiv.classList.add('hidden');
+      downloadBtn.style.display = 'none';
+      progressBar.style.width = '0%';
+      progressText.textContent = 'بارگذاری فایل مرجع...';
+
+      try {
+        // ====== ۱. ساخت ایندکس از فایل دوم ======
+        const wb2 = new ExcelJS.Workbook();
+        await wb2.xlsx.load(state.file2Buffer);
+        const ws2 = wb2.worksheets[0];
+
+        // Map: مقدار نرمال‌شده کلید → {row, data:{colIndex:value}}
+        const refMap = new Map();
+        const lastRow2 = ws2.rowCount;
+        progressBar.style.width = '10%';
+
+        // فقط ستون‌های مورد نیاز را نگه می‌داریم: کلید + ستون‌های افزودنی
+        const colsToFetch = [col2Idx, ...addCols.map(c => c.index)];
+
+        for (let r = startRow; r <= lastRow2; r++) {
+          const keyVal = cellToString(ws2.getCell(r, col2Idx + 1));
+          if (keyVal === '') continue;
+          const nKey = normalize(keyVal);
+          if (nKey === '') continue;
+          if (refMap.has(nKey)) continue; // اولین تطبیق را نگه می‌داریم
+
+          const data = {};
+          for (const ci of colsToFetch) {
+            data[ci] = cellToString(ws2.getCell(r, ci + 1));
+          }
+          refMap.set(nKey, { row: r, data });
+        }
+
+        if (refMap.size === 0) {
+          showToast('ستون کلید مرجع خالی است');
+          runBtn.disabled = false;
+          progressWrap.classList.add('hidden');
+          return;
+        }
+
+        progressText.textContent = `${refMap.size} مقدار ایندکس شد. پردازش فایل اول...`;
+        progressBar.style.width = '20%';
+
+        // ====== ۲. پردازش فایل اول ======
+        const wb1 = new ExcelJS.Workbook();
+        await wb1.xlsx.load(state.file1Buffer);
+        const ws1 = wb1.worksheets[0];
+
+        const originalMaxCol = Math.max(ws1.columnCount, 1);
+
+        // ستون نتیجه جستجو = بعد از آخرین ستون اصلی
+        const resultCol = originalMaxCol + 1;
+        // ستون‌های افزودنی بعد از نتیجه
+        const addColStart = resultCol + 1;
+
+        // نوشتن هدرها در سطر ۱
+        const headerResult = ws1.getCell(1, resultCol);
+        headerResult.value = 'نتیجه جستجو';
+        headerResult.font = { bold: true };
+
+        addCols.forEach((ac, i) => {
+          const hc = ws1.getCell(1, addColStart + i);
+          hc.value = ac.header;
+          hc.font = { bold: true };
+        });
+
+        let countMatch = 0, countNoMatch = 0, countTotal = 0;
+        const lastRow1 = ws1.rowCount;
+        const argb = 'FF' + rowColor.replace('#', '');
+        const maxColToColor = resultCol + addCols.length;
+
+        for (let r = startRow; r <= lastRow1; r++) {
+          const keyVal = cellToString(ws1.getCell(r, col1Idx + 1));
+          if (keyVal === '') continue;
+          countTotal++;
+          const nKey = normalize(keyVal);
+
+          if (refMap.has(nKey)) {
+            // ✅ پیدا شد → نتیجه + افزودن ستون‌ها
+            const found = refMap.get(nKey);
+
+            const resCell = ws1.getCell(r, resultCol);
+            resCell.value = matchText;
+            resCell.font = { bold: true, color: { argb: 'FF2E7D32' } };
+            resCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            resCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+
+            addCols.forEach((ac, i) => {
+              const target = ws1.getCell(r, addColStart + i);
+              const value = found.data[ac.index] || '';
+              target.value = value;
+              target.font = { color: { argb: 'FF2E7D32' } };
+              target.alignment = { horizontal: 'right', vertical: 'middle' };
+            });
+
+            countMatch++;
+          } else {
+            // ❌ پیدا نشد → رنگ کردن کل سطر
+            for (let c = 1; c <= maxColToColor; c++) {
+              const cell = ws1.getCell(r, c);
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } };
+              cell.font = { color: { argb: 'FF9C0006' } };
+            }
+            const resCell = ws1.getCell(r, resultCol);
+            resCell.value = '✗ یافت نشد';
+            resCell.font = { bold: true, color: { argb: 'FF9C0006' } };
+            resCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            // ستون‌های افزودنی خالی با رنگ
+            addCols.forEach((ac, i) => {
+              const target = ws1.getCell(r, addColStart + i);
+              target.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } };
+            });
+
+            countNoMatch++;
+          }
+
+          if (r % 20 === 0 || r === lastRow1) {
+            const pct = 20 + Math.round(((r - startRow) / Math.max(1, lastRow1 - startRow)) * 70);
+            progressBar.style.width = pct + '%';
+            progressText.textContent = `پردازش سطر ${r} از ${lastRow1}...`;
+            await new Promise(res => setTimeout(res, 0));
+          }
+        }
+
+        // عرض ستون‌ها
+        ws1.getColumn(resultCol).width = 15;
+        for (let i = 0; i < addCols.length; i++) {
+          ws1.getColumn(addColStart + i).width = 20;
+        }
+
+        // خروجی
+        progressText.textContent = 'ساخت فایل خروجی...';
+        progressBar.style.width = '95%';
+        const buffer = await wb1.xlsx.writeBuffer();
+        const blob = new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        state.resultBlob = blob;
+        state.resultName = state.file1Name.replace(/\.(xlsx|xls)$/i, '') + '-نتیجه.xlsx';
+
+        progressBar.style.width = '100%';
+        progressText.textContent = 'تمام شد ✓';
+
+        $('countMatch').textContent = countMatch;
+        $('countNoMatch').textContent = countNoMatch;
+        $('countTotal').textContent = countTotal;
+        resultsDiv.classList.remove('hidden');
+        downloadBtn.style.display = 'inline-block';
+
+        showToast(`✓ ${countMatch} پیدا شد | ✗ ${countNoMatch} پیدا نشد`);
+      } catch (err) {
+        console.error(err);
+        showToast('خطا: ' + err.message);
+      } finally {
+        runBtn.disabled = false;
+        setTimeout(() => progressWrap.classList.add('hidden'), 1000);
+      }
+    });
+
+    // ====== DOWNLOAD ======
+    downloadBtn.addEventListener('click', () => {
+      if (!state.resultBlob) return;
+      saveAs(state.resultBlob, state.resultName);
+    });
+
+    // ====== RESET ======
+    resetBtn.addEventListener('click', () => {
+      state.file1Buffer = state.file2Buffer = null;
+      state.resultBlob = null;
+      state.file1Name = state.file2Name = '';
+      state.file1Headers = [];
+      state.file2Headers = [];
+      name1.textContent = name2.textContent = '';
+      file1.value = file2.value = '';
+      $('col1Select').innerHTML = '<option value="">-- ابتدا فایل را بارگذاری کنید --</option>';
+      $('col2Select').innerHTML = '<option value="">-- ابتدا فایل را بارگذاری کنید --</option>';
+      addColsBox.innerHTML = '<p style="color:#999;font-size:12px;text-align:center;padding:10px;">ابتدا فایل دوم را بارگذاری کنید</p>';
+      resultsDiv.classList.add('hidden');
+      downloadBtn.style.display = 'none';
+      runBtn.disabled = true;
+      step2.classList.add('disabled');
+      step3.classList.add('disabled');
+      progressBar.style.width = '0%';
+      progressWrap.classList.add('hidden');
+    });
+
+    // ====== TOAST ======
+    let toastTimer;
+    function showToast(msg) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ====== PWA ======
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW:', err));
+      });
+    }
+  </script>
+</body>
+</html>
